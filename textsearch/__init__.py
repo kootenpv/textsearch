@@ -40,7 +40,7 @@ def determine_case(word):
 HTTP_FIX = re.compile("https?://[^ ]+")
 
 
-def prefix_regex_handler(r, flags=re.IGNORECASE):
+def prefix_regex_handler(r, flags=0):
     regex = re.compile(r, flags=flags)
 
     def regex_handler(text, start, stop, norm):
@@ -53,7 +53,7 @@ def prefix_regex_handler(r, flags=re.IGNORECASE):
     return regex_handler
 
 
-def postfix_regex_handler(r, flags=re.IGNORECASE):
+def postfix_regex_handler(r, flags=0):
     regex = re.compile(r, flags=flags)
 
     def regex_handler(text, start, stop, norm):
@@ -191,13 +191,17 @@ class TextSearch(object):
         self._root_dict = {}
 
     def add_http_handler(self, keep_result):
-        self.automaton.add_word("http://", (7, "$HTTP"))
-        self.automaton.add_word("https://", (8, "$HTTP"))
-        self.automaton.add_word("www.", (4, "$HTTP"))
-        self.handlers.append(
-            # ("$HTTP", keep_result, regex_handler)
-            ("$HTTP", keep_result, prefix_regex_handler("(https?://|ftp://|www.)[^ ]+"))
+        self.add_regex_handler(
+            ["http://", "https://", "www."], "({words})[^ ]+", prefix_regex_handler, keep_result
         )
+
+    def add_regex_handler(self, words, regex, keep_result, prefix=True):
+        name = "$" + re.sub("[^a-zA-Z]", "", words[0]).upper()
+        for word in words:
+            self.automaton.add_word(word, (len(word), name))
+        regex = regex.format(words="|".join([re.escape(x) for x in words]))
+        handler = prefix_regex_handler if prefix else postfix_regex_handler
+        self.handlers.append((name, keep_result, handler(regex)))
 
     def merge(self, ts, complain=True):
         print("OK")
@@ -342,10 +346,10 @@ class TextSearch(object):
 
     def bounds_check(self, text, start, stop, norm):
         if len(text) != stop and text[stop] in self.right_bound_chars:
-            return None, None
+            return None, None, None
         # watch out... cannot just get index as we might risk -1
         if start != 0 and text[start - 1] in self.left_bound_chars:
-            return None, None
+            return None, None, None
         return start, stop, self.extract_fn(start, stop, norm, text)
 
     def contains(self, text):
