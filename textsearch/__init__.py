@@ -27,6 +27,10 @@ class TSResult(object):
         )
 
 
+def to_sentence_case(k):
+    return k[0].upper() + k[1:].lower()
+
+
 def determine_case(word):
     if word == word.upper():
         return "upper"
@@ -34,33 +38,45 @@ def determine_case(word):
         return "title"
     if word == word.lower():
         return "lower"
+    if word == to_sentence_case(word):
+        return "sent"
     return "mixed"
 
+
+case_fn = {
+    "upper": str.upper,
+    "lower": str.lower,
+    "title": str.title,
+    "sent": to_sentence_case
+    # else: cover with .get(, lambda x: x)
+}
 
 HTTP_FIX = re.compile("https?://[^ ]+")
 
 
-def prefix_regex_handler(r, flags=0):
+def prefix_regex_handler(r, return_value, flags=0):
     regex = re.compile(r, flags=flags)
 
     def regex_handler(text, start, stop, norm):
         reg_res = regex.match(text[start:])
         if reg_res:
             stop = start + reg_res.end()
-            return start, stop, reg_res.group()
+            rv = return_value or reg_res.group()
+            return start, stop, rv
         return start, stop, None
 
     return regex_handler
 
 
-def postfix_regex_handler(r, flags=0):
+def postfix_regex_handler(r, return_value, flags=0):
     regex = re.compile(r, flags=flags)
 
     def regex_handler(text, start, stop, norm):
         reg_res = regex.search(text[:stop])
         if reg_res:
             start = reg_res.start()
-            return start, stop, reg_res.group()
+            rv = return_value or reg_res.group()
+            return start, stop, rv
         return start, stop, None
 
     return regex_handler
@@ -73,11 +89,11 @@ def handle_default(text, start, stop, norm):
 reg_res = re.compile("(https?://|ftp://|www.)[^ ]+")
 
 
-def regex_handler(text, start, stop, norm):
-    if reg_res:
-        stop = start + reg_res.end()
-        return stop, reg_res.group()
-    return start, stop, None
+# def regex_handler(text, start, stop, norm):
+#     if reg_res:
+#         stop = start + reg_res.end()
+#         return stop, reg_res.group()
+#     return start, stop, None
 
 
 class TextSearch(object):
@@ -90,6 +106,7 @@ class TextSearch(object):
         replace_foreign_chars=False,
         http=True,
         handlers=None,
+        **kwargs,
     ):
         """ TextSearch is built on a C implementation of Aho-Corasick available in the ahocorasick[0] lib.
 
@@ -190,18 +207,43 @@ class TextSearch(object):
         self.handlers = handlers or []
         self._root_dict = {}
 
-    def add_http_handler(self, keep_result):
-        self.add_regex_handler(
-            ["http://", "https://", "www."], "({words})[^ ]+", prefix_regex_handler, keep_result
-        )
+    def __add__(self, other):
+        if not isinstance(other, TextSearch):
+            raise TypeError("Cannot only be merged with another TextSearch derived class")
+        ts = self.to_ts(other)
+        ts.add(self._root_dict)
+        ts.add(other._root_dict)
+        handlers = []
+        seen = set()
+        for x in self.handlers + other.handlers:
+            if x[-1] not in seen:
+                handlers.append(x)
+                seen.add(x[-1])
+        ts.handlers = handlers
+        return ts
 
-    def add_regex_handler(self, words, regex, keep_result, prefix=True):
-        name = "$" + re.sub("[^a-zA-Z]", "", words[0]).upper()
+    def add_http_handler(self, keep_result):
+        self.add_regex_handler(["http://", "https://", "www."], "({words})[^ ]+", keep_result)
+
+    def add_twitter_handler(self, keep_result):
+        self.add_tweet_hashtag(keep_result)
+        self.add_tweet_mention(keep_result)
+
+    def add_tweet_hashtag(self, keep_result):
+        self.add_regex_handler(["#"], "#[a-zA-Z][^ !$%^&*+.]+", keep_result)
+
+    def add_tweet_mention(self, keep_result):
+        self.add_regex_handler(["@"], "@[a-zA-Z][a-zA-Z0-9_]+", keep_result)
+
+    def add_regex_handler(
+        self, words, regex, keep_result, prefix=True, name=None, return_value=None
+    ):
+        name = name or ("$" + (re.sub("[^a-zA-Z]", "", words[0]).upper() or words[0]))
         for word in words:
-            self.automaton.add_word(word, (len(word), name))
-        regex = regex.format(words="|".join([re.escape(x) for x in words]))
+            self.add_one(word, name)
+        regex = regex.replace("{words}", "|".join([re.escape(x) for x in words]))
         handler = prefix_regex_handler if prefix else postfix_regex_handler
-        self.handlers.append((name, keep_result, handler(regex)))
+        self.handlers.append((name, keep_result, handler(regex, return_value)))
 
     def merge(self, ts, complain=True):
         print("OK")
@@ -215,19 +257,21 @@ class TextSearch(object):
             "_root_dict",
         )
         data = self._root_dict
+        inits = {k: v for k, v in self.__dict__.items() if k not in block_keys}
         if ts.__class__.__name__ == 'type':
-            inits = {k: v for k, v in self.__dict__.items() if k not in block_keys}
             ts = ts(**inits)
+        else:
+            ts = ts.__class__(**inits)
         ts.add(data)
         return ts
 
     def add(self, k, v=None):
-        if isinstance(k, list):
+        if isinstance(k, (set, list)):
             for x in k:
                 self.add_one(x, v)
         elif isinstance(k, dict):
-            for k, v in k.items():
-                self.add_one(k, v)
+            for kk, vv in k.items():
+                self.add_one(kk, vv)
         else:
             self.add_one(k, v)
 
@@ -243,8 +287,9 @@ class TextSearch(object):
 
     def add_insensitive(self, k, v, length):
         if self.returns == "norm":
-            raise ValueError("For returning simply a normalized value, use case='ignore'")
-            # self.automaton.add_word(k.lower(), v)
+            # raise ValueError("For returning simply a normalized value, use case='ignore'")
+            # # self.automaton.add_word(k.lower(), v)
+            self.automaton.add_word(k.lower(), (length, v))
         elif self.returns == "match":
             self.automaton.add_word(k.lower(), (length, -1))
         elif self.returns == "match_case":
@@ -254,6 +299,25 @@ class TextSearch(object):
         # adding object
         else:
             self.automaton.add_word(k.lower(), (length, {"norm": v, "exact": False}))
+
+    def remove(self, k):
+        if k not in self._root_dict:
+            return False
+        del self._root_dict[k]
+        self.words_changed = True
+        if self.replace_foreign_chars:
+            k = unidecode.unidecode(k)
+        if self.case == "smart":
+            self.automaton.remove_word(k)
+            self.automaton.remove_word(k.lower())
+            self.automaton.remove_word(k.title())
+            self.automaton.remove_word(k.upper())
+            self.automaton.remove_word(to_sentence_case(k))
+        elif self.case == "sensitive":
+            self.automaton.remove_word(k)
+        else:
+            self.automaton.remove_word(k.lower())
+        return True
 
     def add_sensitive_string(self, k, v, length):
         case = determine_case(k)
@@ -265,10 +329,13 @@ class TextSearch(object):
         if self.case != "smart":
             return
 
-        for key, case in zip([k.upper(), k.title(), k.lower()], ["upper", "title", "lower"]):
+        for key, case in zip(
+            [k.upper(), k.title(), k.lower(), to_sentence_case(k)],
+            ["upper", "title", "lower", "sent"],
+        ):
             if key == k or key in self.automaton:
                 continue
-            self.automaton.add_word(key, (length, text_value + "_" + case))
+            self.automaton.add_word(key, (length, result))
 
     def add_sensitive_object(self, k, v, length):
         case = determine_case(k)
@@ -279,7 +346,10 @@ class TextSearch(object):
         if self.case != "smart":
             return
 
-        for key, case in zip([k.upper(), k.title(), k.lower()], ["upper", "title", "lower"]):
+        for key, case in zip(
+            [k.upper(), k.title(), k.lower(), to_sentence_case(k)],
+            ["upper", "title", "lower", "sent"],
+        ):
             if key == k or key in self.automaton:
                 continue
             obj = {"match": key, "norm": v, "case": case, "exact": False}
@@ -375,9 +445,13 @@ class TextSearch(object):
                     return True
         return False
 
-    def findall(self, text):
-        self.automaton.make_automaton()
+    def build_automaton(self):
+        if self.words_changed:
+            self.automaton.make_automaton()
         self.words_changed = False
+
+    def findall(self, text):
+        self.build_automaton()
         if self.replace_foreign_chars:
             text = unidecode.unidecode(text)
         keywords = []
@@ -421,8 +495,7 @@ class TextSearch(object):
         return [x[3] for x in keywords]
 
     def extract(self, text):
-        self.automaton.make_automaton()
-        self.words_changed = False
+        self.build_automaton()
         if self.replace_foreign_chars:
             text = unidecode.unidecode(text)
         keywords = []
@@ -465,8 +538,7 @@ class TextSearch(object):
         return [x[-1] for x in keywords]
 
     def extract_overlapping(self, text):
-        self.automaton.make_automaton()
-        self.words_changed = False
+        self.build_automaton()
         keywords = []
         if self.replace_foreign_chars:
             text = unidecode.unidecode(text)
@@ -489,8 +561,7 @@ class TextSearch(object):
     def replace(self, text, return_entities=False):
         if self.returns != "norm":
             raise ValueError("no idea how i would do that")
-        self.automaton.make_automaton()
-        self.words_changed = False
+        self.build_automaton()
         if self.replace_foreign_chars:
             text = unidecode.unidecode(text)
         keywords = [(None, None, 0, ("", ""))]
@@ -527,56 +598,6 @@ class TextSearch(object):
             return text_, [x[-1] for x in keywords[1:-1]]
         return text_
 
-    def _old_replace(self, text):
-        if self.returns != "norm":
-            raise ValueError("no idea how i would do that")
-        self.automaton.make_automaton()
-        self.words_changed = False
-        if self.replace_foreign_chars:
-            text = unidecode.unidecode(text)
-        keywords = [(None, None, 0, "")]
-        current_stop = -1
-        _text = text.lower() if self._ignore_case_in_search else text
-        for end_index, (length, result) in self.automaton.iter(_text):
-            start = end_index - length + 1
-            stop = end_index + 1
-            if self.http and result == "$HTTP":
-                http_res = HTTP_FIX.search(_text[start:])
-                if http_res:
-                    stop = start + http_res.end()
-                    res = (stop - start, start, stop, http_res.group())
-                    if start > current_stop:
-                        keywords.append(res)
-                    elif stop - start > keywords[-1][0]:
-                        keywords[-1] = res
-                    else:
-                        keywords.append(res)
-                    current_stop = max(current_stop, stop)
-                continue
-            if start >= current_stop:
-                result = self.verify_boundaries(
-                    end_index, result, length, self.left_bound_chars, self.right_bound_chars, text
-                )
-                if result is None:
-                    continue
-                current_stop = stop
-                keywords.append((stop - start, start, stop, result))
-            elif stop - start > keywords[-1][0]:
-                result = self.verify_boundaries(
-                    end_index, result, length, self.left_bound_chars, self.right_bound_chars, text
-                )
-                if result is None:
-                    continue
-                current_stop = max(current_stop, stop)
-                keywords[-1] = (stop - start, start, stop, result)
-        keywords.append((None, len(text), None, ""))
-        text_ = ""
-        for (_, start1, stop1, result1), (_, start2, stop2, result2) in zip(
-            keywords[:-1], keywords[1:]
-        ):
-            text_ += text[stop1:start2] + result2
-        return text_
-
     def verify_boundaries(
         self, end_index, result, length, left_non_allowed, right_non_allowed, text
     ):
@@ -598,6 +619,10 @@ class TextSearch(object):
     def extract_insensitive_match(self, start, end, result, text):
         match = text[start:end]
         return match
+
+    def extract_insensitive_norm(self, start, end, result, text):
+        case = determine_case(text[start:end])
+        return case_fn.get(case, lambda x: x)(result)
 
     def extract_insensitive_match_case(self, start, end, result, text):
         match = text[start:end]
@@ -624,6 +649,8 @@ class TextSearch(object):
         if self.case == "insensitive":
             if self.returns == "match":
                 extract_fn = self.extract_insensitive_match
+            elif self.returns == "norm":
+                extract_fn = self.extract_insensitive_norm
             elif self.returns == "match_case":
                 extract_fn = self.extract_insensitive_match_case
             elif self.returns == "norm_case":
@@ -647,6 +674,37 @@ class TextSearch(object):
         if self._ignore_case_in_search or self.case == "smart":
             return key.lower() in self.automaton
         return key in self.automaton
+
+    def __repr__(self):
+        s = ["num_items={}".format(len(self))]
+        if self.left_bound_chars != ALPHANUM:
+            s.append("{}={!r}".format("left_bound_chars", self.left_bound_chars))
+        if self.right_bound_chars != ALPHANUM:
+            s.append("{}={!r}".format("right_bound_chars", self.left_bound_chars))
+        if self.replace_foreign_chars:
+            s.append("replace_foreign_chars=True")
+        return "{}(case={!r}, returns={!r}, {})".format(
+            self.__class__.__name__, self.case, self.returns, ", ".join(s)
+        )
+
+
+# ts = TextSearch("insensitive", "norm")
+# ts.add(contractions_dict)
+# ts.replace("Must've been good")
+
+# def __repr__(self):
+#             case,
+#     returns,
+#     left_bound_chars=ALPHANUM,
+#     right_bound_chars=ALPHANUM,
+#     replace_foreign_chars=False,
+#     http=True,
+#     handlers=None,
+
+#     cases = ["case", "returns", replace_foreign_chars]
+#     atts = {x: str(getattr(self, x)) for x in cases if getattr(self, x, None) is not None}
+#     values = ", ".join(["{}={}".format(x, atts[x]) for x in cases if x in atts])
+#     return "{}({})".format(self.__class__.__name__, atts)
 
 
 # case sensitive vs insensitive
@@ -710,3 +768,26 @@ class TextSearch(object):
 
 # ts = ts.from_ts(ts)
 # ts.tokenized_extract("hi")
+
+# # # merge test.... sometimes unexpected result
+
+# ts = TextSearch("ignore", "match")
+# ts.add_http_handler(True)
+# ts.add("hi")
+
+# ts2 = TextSearch("ignore", "norm")
+# ts2.add_twitter_handler(True)
+# ts2.add("bye")
+
+# text = "hi how are you http://test.com #blindsided bye"
+
+# (ts2 + ts).handlers
+# (ts + ts2).findall(text)
+
+# ts3 = ts2 + ts
+# ts3.handlers = ts3.handlers
+# ts3.findall(text)
+
+# ts4 = ts + ts2
+# ts4.handlers = ts4.handlers
+# ts4.findall(text)
