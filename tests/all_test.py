@@ -203,14 +203,50 @@ def test_repr():
     assert repr(TextSearch("ignore", "match", set(), set()))
 
 
-def test_overlap():
+def test_not_overlap():
     ts = TextSearch("ignore", "norm")
     ts.add("http://")
     ts.add_http_handler(True)
     assert len(ts.findall("https://vks.ai")) == 1
 
 
+def test_not_overlap_2():
+    ts = TextSearch("ignore", "norm")
+    ts.add("hi", "HI")
+    ts.add("hi hi", "h h")
+    assert ts.replace("hi hi") == "h h"
+
+
+def test_not_overlap_3():
+    ts = TextSearch("ignore", "norm")
+    ts.add("a")
+    ts.add("a a")
+    assert ts.findall("a a a") == ["a a", "a"]
+
+
+def test_overlap():
+    ts = TextSearch("ignore", "norm")
+    ts.add("hi")
+    ts.add("hi hi")
+    assert len(ts.find_overlapping("hi hi")) == 3
+
+
 def test_postfix_regex():
     ts = TextSearch("ignore", "norm")
-    ts.add_regex_handler(["products"], "\d+ ", keep_result=True, prefix=False)
+    ts.add_regex_handler(["products"], r"\d+ ", keep_result=True, prefix=False)
     assert ts.findall("90 products") == ["90 products"]
+
+
+def test_foreign_chars():
+    ts = TextSearch("ignore", "norm", replace_foreign_chars=True)
+    ts.add("á", "A")
+    assert "a" in ts
+    assert "á" in ts
+    assert ts.contains("a")
+    assert ts.contains("á")
+    assert ts.findall("a")
+    assert ts.findall("á")
+    assert ts.find_overlapping("a")
+    assert ts.find_overlapping("á")
+    assert ts.replace("a") == "A"
+    assert ts.replace("á") == "A"

@@ -531,37 +531,6 @@ class TextSearch(object):
 
         return regex_handler
 
-    # def verify_boundaries(
-    #     self, end_index, result, length, left_non_allowed, right_non_allowed, text
-    # ):
-    #     ind_after = end_index + 1
-    #     try:
-    #         if text[ind_after] in right_non_allowed:
-    #             return None
-    #     except IndexError:
-    #         pass
-    #     ind_before = end_index - length
-    #     # watch out... cannot just get index as we might risk -1
-    #     if ind_before != -1 and text[ind_before] in left_non_allowed:
-    #         return None
-    #     return self.extract_fn(ind_before + 1, ind_after, result, text)
-
-    # def _extract_overlapping(self, text):
-    #     """ TODO: needs to be updated, this is not what you'd expect"""
-    #     self.build_automaton()
-    #     keywords = []
-    #     if self.replace_foreign_chars:
-    #         text = unidecode.unidecode(text)
-    #     _text = text.lower() if self._ignore_case_in_search else text
-    #     for end_index, (length, result) in self.automaton.iter(_text):
-    #         result = self.verify_boundaries(
-    #             end_index, result, length, self.left_bound_chars, self.right_bound_chars, text
-    #         )
-    #         if result is None:
-    #             continue
-    #         keywords.append(result)
-    #     return keywords
-
     def replace(self, text, return_entities=False):
         """ Replaces known words in text.
         text: str
@@ -654,6 +623,8 @@ class TextSearch(object):
 
     def __contains__(self, key):
         # note that smart includes lowercase, so it's an easy check
+        if self.replace_foreign_chars:
+            key = unidecode.unidecode(key)
         if self._ignore_case_in_search or self.case == "smart":
             return key.lower() in self.automaton
         return key in self.automaton
