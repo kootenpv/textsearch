@@ -13,9 +13,24 @@ It mainly helps with providing convenience for NLP / text search related tasks.
 For example, it will help find tokens by default only if it is a full word match (and not a sub-match).
 Though this is adaptable.
 
+### Showcase
+
+Here a list of the projects that are depending on `textsearch`.
+
+|Name|Explanation|By|
+|---------------------------------|--------------------------|--------------------|
+| ... |  ... |  ... |
+
+
+### Installation
+
+Works on Python 3+ (make an issue if you *really* need Python 2)
+
+    pip install textsearch
+
 ### Examples
 
-See [tests/](tests/) for many more examples.
+See [tests/](tests/) for more usage examples.
 
 #### Finding
 
