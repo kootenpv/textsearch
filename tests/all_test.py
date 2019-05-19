@@ -1,61 +1,216 @@
-from textsearch import TextSearch, TSResult
+import json
+from textsearch import TextSearch
 
 
 def test_ignore_match():
     ts = TextSearch("ignore", "match")
     ts.add("hi")
-    assert ts.extract("hi") == ["hi"]
-    assert ts.extract("HI") == ["hi"]
-    assert ts.extract("asdf") == []
+    assert ts.findall("hi") == ["hi"]
+    assert ts.findall("HI") == ["hi"]
+    assert ts.findall("asdf") == []
 
 
 def test_ignore_norm():
     ts = TextSearch("ignore", "norm")
     ts.add("hi", "HI")
-    assert ts.extract("hi") == ["HI"]
-    assert ts.extract("asdf") == []
+    assert ts.findall("hi") == ["HI"]
+    assert ts.findall("asdf") == []
 
 
 def test_insensitive_match():
     ts = TextSearch("insensitive", "match")
     ts.add("hi")
-    assert ts.extract("HI") == ["HI"]
+    assert ts.findall("HI") == ["HI"]
 
 
 def test_insensitive_object():
-    ts = TextSearch("insensitive", "TSResult")
+    ts = TextSearch("insensitive", "object")
     ts.add("hi")
-    assert ts.extract("HI")[0].end == 2
+    assert ts.findall("HI")[0].end == 2
 
 
 def test_sensitive_match():
-    ts = TextSearch("sensitive", "TSResult")
+    ts = TextSearch("sensitive", "object")
     ts.add("hi")
-    assert ts.extract("hi")
-    assert not ts.extract("HI")
+    assert ts.findall("hi")
+    assert not ts.findall("HI")
 
 
 def test_smart_match():
-    ts = TextSearch("smart", "TSResult")
+    ts = TextSearch("smart", "object")
     ts.add("hi")
-    assert ts.extract("hi")[0].case == "lower"
-    assert ts.extract("hi")[0].is_exact
-    assert ts.extract("HI")[0].case == "upper"
-    assert not ts.extract("HI")[0].is_exact
-    assert ts.extract("Hi")[0].case == "title"
-    assert not ts.extract("Hi")[0].is_exact
+    assert ts.findall("hi")[0].case == "lower"
+    assert ts.findall("hi")[0].is_exact
+    assert ts.findall("HI")[0].case == "upper"
+    assert not ts.findall("HI")[0].is_exact
+    assert ts.findall("Hi")[0].case == "title"
+    assert not ts.findall("Hi")[0].is_exact
     ts.add("hI")
-    assert ts.extract("hI")[0].case == "mixed"
-    assert ts.extract("hI")[0].is_exact
+    assert ts.findall("hI")[0].case == "mixed"
+    assert ts.findall("hI")[0].is_exact
 
 
 def test_add_list():
     ts = TextSearch("smart", "match")
     ts.add(["hi", "bye", "hello"])
-    assert ts.extract("hi bye hello") == ["hi", "bye", "hello"]
+    assert ts.findall("hi bye hello") == ["hi", "bye", "hello"]
 
 
-def test_add_list():
+def test_add_dict():
     ts = TextSearch("smart", "norm")
     ts.add({"hi": "greeting", "bye": "bye", "goodbye": "bye"})
-    assert ts.extract("hi bye goodbye") == ["greeting", "bye", "bye"]
+    assert ts.findall("hi bye goodbye") == ["greeting", "bye", "bye"]
+
+
+def test_replace():
+    ts = TextSearch("sensitive", "norm")
+    ts.add("hi", "HI")
+    assert ts.replace("test hi test") == "test HI test"
+
+
+def test_replace_insensitive_keep_casing():
+    ts = TextSearch("insensitive", "norm")
+    ts.add("hi", "bye")
+    assert ts.replace("test Hi test") == "test Bye test"
+    assert ts.replace("test HI test") == "test BYE test"
+
+
+def test_serializable():
+    ts = TextSearch("sensitive", dict)
+    ts.add("hi")
+    result = ts.findall("hi")
+    assert result
+    assert json.dumps(result)
+
+
+def test_http():
+    ts = TextSearch("ignore", "norm")
+    ts.add_http_handler(keep_result=True)
+    assert ts.findall("http://google.com") == ["http://google.com"]
+
+
+def test_http_no_keep():
+    ts = TextSearch("ignore", "norm")
+    ts.add_http_handler(keep_result=False)
+    ts.add("google")
+    assert ts.findall("http://google.com") == []
+
+
+def test_twitter():
+    ts = TextSearch("ignore", "norm")
+    ts.add_twitter_handler(keep_result=True)
+    assert ts.findall("@hello") == ["@hello"]
+    assert ts.findall("#hello") == ["#hello"]
+
+
+def test_custom_handler():
+    def custom_handler(text, start, stop, norm):
+        return start, stop, text[start:stop] + " is OK"
+
+    ts = TextSearch("ignore", "norm", handlers=[("HI", True, custom_handler)])
+    ts.add("hi", "HI")
+    assert ts.findall("hi HI") == ['hi is OK', 'HI is OK']
+
+
+def test_ignore_contains_word():
+    ts = TextSearch("ignore", "norm")
+    ts.add("hi", "HI")
+    assert "hi" in ts
+    assert "HI" in ts
+
+
+def test_sensitive_contains_word():
+    ts = TextSearch("sensitive", "norm")
+    ts.add("hi", "HI")
+    assert "hi" in ts
+    assert "HI" not in ts
+
+
+def test_contains():
+    ts = TextSearch("sensitive", "norm")
+    ts.add("hi", "HI")
+    assert ts.contains("hi")
+
+
+def test_to_ts():
+    ts = TextSearch("sensitive", "norm")
+    ts.add("hi")
+    assert "hi" in ts.to_ts(TextSearch)
+
+
+def test_sensitive_remove():
+    ts = TextSearch("sensitive", "norm")
+    ts.add("hi")
+    assert len(ts) == 1
+    ts.remove("hi")
+    assert not len(ts)
+
+
+def test_ignore_remove():
+    ts = TextSearch("ignore", "norm")
+    ts.add("hi")
+    assert len(ts) == 1
+    ts.remove("hi")
+    assert not len(ts)
+
+
+def test_smart_remove():
+    ts = TextSearch("smart", "norm")
+    ts.add("hi")
+    assert len(ts) == 3
+    ts.remove("hi")
+    assert not len(ts)
+
+
+def test_fast_no_bounds():
+    ts = TextSearch("sensitive", "match", set(), set())
+    ts.add("hi")
+    assert ts.findall("asdfhiadsfs")
+
+
+def test_left_bounds():
+    ts = TextSearch("sensitive", "match")
+    ts.add("hi")
+    assert not ts.findall("asfdhi")
+
+
+def test_right_bounds():
+    ts = TextSearch("sensitive", "match")
+    ts.add("hi")
+    assert not ts.findall("hiasf")
+
+
+def test_merge():
+    ts1 = TextSearch("sensitive", "match")
+    ts2 = TextSearch("sensitive", "match")
+    ts1.add("hi")
+    ts2.add("hi")
+    assert len(ts1 + ts2) == 1
+    ts1.remove("hi")
+    ts2.add("bye")
+    assert len(ts1 + ts2) == 2
+
+
+def test_merge_handler():
+    ts1 = TextSearch("sensitive", "norm")
+    ts2 = TextSearch("sensitive", "norm")
+    ts1.add_http_handler(True)
+    assert (ts1 + ts2).handlers
+
+
+def test_repr():
+    assert repr(TextSearch("ignore", "match"))
+    assert repr(TextSearch("ignore", "match", set(), set()))
+
+
+def test_overlap():
+    ts = TextSearch("ignore", "norm")
+    ts.add("http://")
+    ts.add_http_handler(True)
+    assert len(ts.findall("https://vks.ai")) == 1
+
+
+def test_postfix_regex():
+    ts = TextSearch("ignore", "norm")
+    ts.add_regex_handler(["products"], "\d+ ", keep_result=True, prefix=False)
+    assert ts.findall("90 products") == ["90 products"]
