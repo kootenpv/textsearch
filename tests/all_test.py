@@ -250,3 +250,15 @@ def test_foreign_chars():
     assert ts.find_overlapping("á")
     assert ts.replace("a") == "A"
     assert ts.replace("á") == "A"
+
+
+def test_regex_norm():
+    ts = TextSearch("insensitive", "norm")
+    ts.add_regex_handler(["last"], r" \d", keep_result=True)
+    assert ts.findall("last 5") == ["last 5"]
+
+
+def test_regex_object():
+    ts = TextSearch("insensitive", "object")
+    ts.add_regex_handler(["last"], r" \d", keep_result=True)
+    assert ts.findall("last 5")[0].norm == "last 5"

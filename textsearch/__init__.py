@@ -230,8 +230,8 @@ class TextSearch(object):
 
         Warning: better not to try to use regex with too short of a prefix, e.g. just a single letter.
         """
-        if self.returns is not "norm":
-            raise ValueError("Regex currently only works with returns='norm'")
+        # if self.returns is not "norm":
+        #     raise ValueError("Regex currently only works with returns='norm'")
         name = name or ("$" + (re.sub("[^a-zA-Z]", "", words[0]).upper() or words[0]))
         for word in words:
             self.add_one(word, name)
@@ -418,21 +418,21 @@ class TextSearch(object):
         keywords = []
         current_stop = -1
         _text = text.lower() if self._ignore_case_in_search else text
-        if not self.handlers and not self.left_bound_chars and not self.right_bound_chars:
-            # might overlap?
-            for end_index, (length, norm) in self.automaton.iter(_text):
-                start = end_index - length + 1
-                stop = end_index + 1
-                res = self.extract_fn(end_index - length + 1, end_index + 1, norm, text)
-                if start >= current_stop:
-                    current_stop = stop
-                    result = (current_stop - start, start, current_stop, res)
-                    keywords.append(result)
-                elif stop - start > keywords[-1][0]:
-                    current_stop = max(stop, current_stop)
-                    result = (current_stop - start, start, current_stop, res)
-                    keywords[-1] = result
-            return [x[3] for x in keywords]
+        # if not self.handlers and not self.left_bound_chars and not self.right_bound_chars:
+        #     # might overlap?
+        #     for end_index, (length, norm) in self.automaton.iter(_text):
+        #         start = end_index - length + 1
+        #         stop = end_index + 1
+        #         res = self.extract_fn(end_index - length + 1, end_index + 1, norm, text)
+        #         if start >= current_stop:
+        #             current_stop = stop
+        #             result = (current_stop - start, start, current_stop, res)
+        #             keywords.append(result)
+        #         elif stop - start > keywords[-1][0]:
+        #             current_stop = max(stop, current_stop)
+        #             result = (current_stop - start, start, current_stop, res)
+        #             keywords[-1] = result
+        #     return [x[3] for x in keywords]
         handlers = self.handlers + [(False, True, self.bounds_check)]
         for end_index, (length, norm) in self.automaton.iter(_text):
             if norm is None:
@@ -440,7 +440,7 @@ class TextSearch(object):
             start = end_index - length + 1
             stop = end_index + 1
             for compare, keep_result, handler in handlers:
-                if compare and compare is not norm:
+                if compare and compare is not norm and norm != {"norm": compare, "exact": False}:
                     continue
                 start, stop, result = handler(text, start, stop, norm)
                 if result is None:  # maybe want to remove this
@@ -510,6 +510,9 @@ class TextSearch(object):
             if reg_res:
                 stop = stop + reg_res.end()
                 rv = return_value or text[start:stop]
+                if not isinstance(self.returns, str):
+                    rv = {"norm": rv}
+                rv = self.extract_fn(start, stop, rv, text)
                 return start, stop, rv
             return start, stop, None
 
@@ -526,6 +529,9 @@ class TextSearch(object):
             if reg_res:
                 start = reg_res.start()
                 rv = return_value or text[start:stop]
+                if not isinstance(self.returns, str):
+                    rv = {"norm": rv}
+                rv = self.extract_fn(start, stop, rv, text)
                 return start, stop, rv
             return start, stop, None
 
