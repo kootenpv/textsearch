@@ -1,8 +1,8 @@
-# textsearch
-
 <p align="center">
   <img src="./resources/tslogo.png"/>
 </p>
+
+# textsearch
 
 [![Build Status](https://travis-ci.org/kootenpv/textsearch.svg?branch=master)](https://travis-ci.org/kootenpv/textsearch)
 [![Coverage Status](https://coveralls.io/repos/github/kootenpv/textsearch/badge.svg?branch=master)](https://coveralls.io/github/kootenpv/textsearch?branch=master)
