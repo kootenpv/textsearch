@@ -254,11 +254,18 @@ def test_foreign_chars():
 
 def test_regex_norm():
     ts = TextSearch("insensitive", "norm")
-    ts.add_regex_handler(["last"], r" \d", keep_result=True)
+    ts.add_regex_handler(["last "], r"\d", keep_result=True)
     assert ts.findall("last 5") == ["last 5"]
 
 
 def test_regex_object():
     ts = TextSearch("insensitive", "object")
-    ts.add_regex_handler(["last"], r" \d", keep_result=True)
+    ts.add_regex_handler(["last "], r"\d", keep_result=True)
+    assert ts.findall("last 5")[0].norm == "last 5"
+
+
+def test_regex_overlap():
+    ts = TextSearch("insensitive", "object")
+    ts.add_regex_handler(["last "], r"\d", keep_result=True)
+    ts.add("last")
     assert ts.findall("last 5")[0].norm == "last 5"

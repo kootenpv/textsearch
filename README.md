@@ -5,13 +5,21 @@
 [![PyPI](https://img.shields.io/pypi/v/textsearch.svg?style=flat-square)](https://pypi.python.org/pypi/textsearch/)
 [![PyPI](https://img.shields.io/pypi/pyversions/textsearch.svg?style=flat-square)](https://pypi.python.org/pypi/textsearch/)
 
-Find and/or replace multiple strings in text; focusing on convenience and utilizing C for speed.
-
-Sometimes 100x faster than regex based approaches, and even usually 2-3x faster than flashtext.
+Find and/or replace multiple strings in text; focusing on convenience and using C for speed.
 
 It mainly helps with providing convenience for NLP / text search related tasks.
 For example, it will help find tokens by default only if it is a full word match (and not a sub-match).
-Though this is adaptable.
+
+### Features
+
+- ✓ Compared to equivalent in regex, usually ~30-100x faster
+- ✓ Tokenizer, string replacer, spell checker and many more things can be built on this (stay-tuned)
+- ✓ Extendable (write your own handlers)
+- ✓ Supports a prefix- or postfix based regex, usually something missing with other matchers
+- ✓ Few depencies (relies on a C-module, credits to [WojciechMula/pyahocorasick](WojciechMula/pyahocorasick))
+- ✓ Similar to [flashtext](https://github.com/vi3k6i5/flashtext) (by my friend Vikash), but 30% faster, as convenient, and more features
+- ✓ Optional support for accented characters (~15% slowdown)
+- ✓ Lots of [tests](test/all_test.py) (good place to see examples for inspiration) and good coverage
 
 ### Showcase
 
@@ -28,11 +36,23 @@ Works on Python 3+ (make an issue if you *really* need Python 2)
 
     pip install textsearch
 
-### Examples
+### Main functionality
 
-See [tests/](tests/) for more usage examples.
+```python
+ts = TextSearch("ignore", "norm")
+ts.add("hi", "HI")
+"hi" in ts            # True
+ts.contains("hi!")    # True
+ts.replace("hi!")     # "HI!"
+ts.remove("hi")
+ts.contains("hi!")    # False
+ts
+TextSearch(case='ignore', returns='norm', num_items=0)
+```
 
-#### Finding
+### More examples
+
+See [tests/](tests/all_test.py) for more usage examples.
 
 ```python
 from textsearch import TextSearch
@@ -104,7 +124,7 @@ ts.findall("hI")
         Regex can only be used when using norm
         The default handler that gets added in any case will check boundaries.
         Check how to conveniently add regex at the `add_regex_handler` function.
-        Default: (False, True, self.bounds_check)
+        Default: [(False, True, self.bounds_check)]
         - The first argument should be the normalized tag to fire on.
         - The second argument should be whether to keep the result
         - The third should be the handler function, that takes the arguments:
@@ -123,19 +143,3 @@ ts.findall("hI")
           >>> ts.add("hi", "HI")
           >>> ts.findall("hi HI")
           ['hi is OK', 'HI is OK']
-
-Other useful functions:
-
-    ts = TextSearch("ignore", "norm")
-    ts.add("hi", "HI")
-    "hi" in ts            # True
-    ts.contains("hi!")    # True
-    ts.replace("hi!")     # "HI"
-    ts.remove("hi")
-    ts.contains("hi!")    # False
-    ts
-    TextSearch(case='ignore', returns='norm', num_items=0)
-
-### Dependency
-
-TextSearch is built on a C implementation of Aho-Corasick available in the [ahocorasick](https://github.com/WojciechMula/pyahocorasick) lib.
