@@ -61,7 +61,7 @@ class TextSearch(object):
         right_bound_chars=ALPHANUM,
         replace_foreign_chars=False,
         handlers=None,
-        **kwargs,
+        **kwargs
     ):
         """ TextSearch is built on a C implementation of Aho-Corasick available in the ahocorasick[0] lib.
 

@@ -147,3 +147,7 @@ ts.findall("hI")
           >>> ts.add("hi", "HI")
           >>> ts.findall("hi HI")
           ['hi is OK', 'HI is OK']
+
+### Benchmarks
+
+Coming soon, will compare what's available in Java and Go as well, and flashtext, regex.
