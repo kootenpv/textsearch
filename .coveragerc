@@ -9,6 +9,6 @@ exclude_lines =
 omit =
     deploy.py
     setup.py
-    .tox
-    dist
-    build
+    .tox/*
+    dist/*
+    build/*
