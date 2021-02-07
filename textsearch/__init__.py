@@ -1,6 +1,6 @@
 import re
 import string
-import unidecode
+from anyascii import anyascii
 import ahocorasick
 
 ALPHANUM = set(string.digits + string.ascii_letters + '_')
@@ -294,7 +294,7 @@ class TextSearch(object):
         del self._root_dict[k]
         self.words_changed = True
         if self.replace_foreign_chars:
-            k = unidecode.unidecode(k)
+            k = anyascii(k)
         if self.case == "smart":
             self.automaton.remove_word(k)
             self.automaton.remove_word(k.lower())
@@ -355,7 +355,7 @@ class TextSearch(object):
         self._root_dict[k] = v
         self.words_changed = True
         if self.replace_foreign_chars:
-            k = unidecode.unidecode(k)
+            k = anyascii(k)
 
         v = k if v is None else v
         length = len(k)
@@ -383,7 +383,7 @@ class TextSearch(object):
         self.automaton.make_automaton()
         self.words_changed = False
         if self.replace_foreign_chars:
-            text = unidecode.unidecode(text)
+            text = anyascii(text)
         _text = text.lower() if self._ignore_case_in_search else text
         if not self.handlers and not self.left_bound_chars and not self.right_bound_chars:
             for end_index, (length, norm) in self.automaton.iter(_text):
@@ -414,7 +414,7 @@ class TextSearch(object):
         """
         self.build_automaton()
         if self.replace_foreign_chars:
-            text = unidecode.unidecode(text)
+            text = anyascii(text)
         keywords = []
         current_stop = -1
         _text = text.lower() if self._ignore_case_in_search else text
@@ -474,7 +474,7 @@ class TextSearch(object):
         """
         self.build_automaton()
         if self.replace_foreign_chars:
-            text = unidecode.unidecode(text)
+            text = anyascii(text)
         keywords = []
         _text = text.lower() if self._ignore_case_in_search else text
         if not self.handlers and not self.left_bound_chars and not self.right_bound_chars:
@@ -547,7 +547,7 @@ class TextSearch(object):
             raise ValueError("no idea how i would do that")
         self.build_automaton()
         if self.replace_foreign_chars:
-            text = unidecode.unidecode(text)
+            text = anyascii(text)
         keywords = [(None, None, 0, ("", ""))]
         current_stop = -1
         _text = text.lower() if self._ignore_case_in_search else text
@@ -630,7 +630,7 @@ class TextSearch(object):
     def __contains__(self, key):
         # note that smart includes lowercase, so it's an easy check
         if self.replace_foreign_chars:
-            key = unidecode.unidecode(key)
+            key = anyascii(key)
         if self._ignore_case_in_search or self.case == "smart":
             return key.lower() in self.automaton
         return key in self.automaton
