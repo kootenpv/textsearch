@@ -31,7 +31,9 @@ Here a list of the projects that are depending on `textsearch`.
 
 |Name|Explanation|By|
 |---------------------------------|--------------------------|--------------------|
-| ... |  ... |  ... |
+| [rebrand](https://github.com/kootenpv/rebrand) |  Refactor your software using programming language independent string replacement. |  [kootenpv](https://github.com/kootenpv) |
+| [contractions](https://github.com/kootenpv/contractions) |  Fixes contractions such as `you're` to you `are` |  [kootenpv](https://github.com/kootenpv) |
+| [tok](https://github.com/kootenpv/tok) |  Find strings/words in text; convenience and C speed |  [kootenpv](https://github.com/kootenpv) |
 
 
 ### Installation
