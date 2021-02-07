@@ -13,7 +13,7 @@ setup(
     author='Pascal van Kooten',
     url='https://github.com/kootenpv/textsearch',
     author_email='kootenpv@gmail.com',
-    install_requires=["pyahocorasick", "Unidecode"],
+    install_requires=["anyascii", "pyahocorasick"],
     classifiers=[
         'Intended Audience :: Developers',
         'Intended Audience :: Customer Service',
