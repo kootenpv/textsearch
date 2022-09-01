@@ -456,7 +456,10 @@ class TextSearch(object):
                 elif stop - start > keywords[-1][0]:
                     current_stop = max(stop, current_stop)
                     result = (current_stop - start, start, current_stop, result)
-                    keywords[-1] = result
+                    keep_up_to_ind = next((i for i, k in enumerate(keywords) if k[1] == start),
+                                          -1)  # find the first index of a keyword with the same starting position
+                    keywords = keywords[:keep_up_to_ind]  # keep keyword up to this index
+                    keywords.append(result)  # append the current keyword that contains all the removed keywords
                     # whyyyyy ?? better commment it out
                     # else:
                     #     import pdb
