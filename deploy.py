@@ -18,13 +18,15 @@ version = "{}.{}.{}".format(major, minor, micro)
 with open("setup.py", "w") as f:
     f.write(setup)
 
-with open("textsearch/__init__.py") as f:
+name = os.getcwd().split("/")[-1]
+
+with open(f"{name}/__init__.py") as f:
     init = f.read()
 
-with open("textsearch/__init__.py", "w") as f:
+with open(f"{name}/__init__.py", "w") as f:
     f.write(re.sub('__version__ = "[0-9.]+"', '__version__ = "{}"'.format(version), init))
 
-os.system("rm -rf dist/*")
-py_version = "python3.7" if sh.which("python3.7") is not None else "python"
+py_version = "python"
+os.system("rm -rf dist/")
 os.system("{} setup.py sdist bdist_wheel".format(py_version))
 os.system("twine upload dist/*")
